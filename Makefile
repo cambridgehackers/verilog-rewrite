@@ -19,17 +19,16 @@
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-CXX   ?= clang++
-CXXFLAGS = -O0 -g -Wall -std=c++11 -fno-diagnostics-color -DYYDEBUG
-CPPOBJ = main
-OBJS  = $(addsuffix .o, $(CPPOBJ))
+ATOMICCDIR = ../atomicc
+CUDDINC = -I../cudd/cudd
+CUDDLIB = ../cudd/cudd/.libs/libcudd.a
+CXX = clang++
+CXXFLAGS = -O0 -g -Wall -std=c++11 -fblocks -fno-diagnostics-color -DYYDEBUG
+CXXFLAGS += -I$(ATOMICCDIR) $(CUDDINC)
+OBJS  = main.o expr.o
 
-CLEANLIST =  $(addsuffix .o, $(OBJ)) $(OBJS) \
-     verilog.tab.c verilog.tab.h location.hh position.hh \
-     stack.hh verilog.output vlex.yy.c verilogRewrite
-
-all: vlex.yy.c verilog.tab.c main.cpp main.o
-	$(CXX) $(CXXFLAGS) -o verilogRewrite main.o $(LIBS)
+all: vlex.yy.c verilog.tab.c main.cpp $(OBJS)
+	$(CXX) $(CXXFLAGS) -o verilogRewrite $(OBJS) -lBlocksRuntime $(CUDDLIB)
 
 verilog.tab.c: verilog.y
 	bison -d -v verilog.y
@@ -37,6 +36,10 @@ verilog.tab.c: verilog.y
 vlex.yy.c: vlex.l
 	flex --outfile=vlex.yy.c  $<
 
+expr.o: $(ATOMICCDIR)/expr.cpp
+	$(CXX) -c $(CXXFLAGS) -o $@ $<
+
 clean:
-	rm -rf $(CLEANLIST)
+	rm -rf $(OBJS) verilog.tab.c verilog.tab.h location.hh position.hh \
+		stack.hh verilog.output vlex.yy.c verilogRewrite *.v.out
 

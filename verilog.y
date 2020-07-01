@@ -112,7 +112,10 @@ list_of_ports:           // IEEE: list_of_ports + list_of_port_declarations
 port:                    // ==IEEE: port
                  portDirNetE signingE rangeList  portSig variable_dimensionListE sigAttrListE { createPort(); }
         |        portDirNetE /*implicit*/        portSig variable_dimensionListE sigAttrListE { createPort(); }
+	|        portDirNetE /*implicit*/    '.' portSig '(' portAssignExpr ')' sigAttrListE  { currentPort.expr = tokenExpr; createPort(); }
          ;
+portAssignExpr:
+        expr    { currentPort.expr = tokenExpr; }
 portDirNetE:             // IEEE: part of port, optional net type and/or direction
                 /* empty */              { clearRange(); }
         |        port_direction          { clearRange(); }
@@ -201,9 +204,20 @@ module_or_generate_item:        // ==IEEE: module_or_generate_item
 module_common_item:        // ==IEEE: module_common_item
                 module_or_generate_item_declaration
         |        etcInst
+        |        continuous_assign
+        ;
+continuous_assign:        // IEEE: continuous_assign
+                yASSIGN delayE assignList ';'
         ;
 module_or_generate_item_declaration:        // ==IEEE: module_or_generate_item_declaration
                 package_or_generate_item_declaration
+        ;
+assignList:
+                assignOne
+        |        assignList ',' assignOne
+        ;
+assignOne:
+                variable_lvalue '=' expr { currentModule.assigns.push_back(AssignInfo{idDotted, tokenExpr}); }
         ;
 delayE: /* empty */ ;
 netSigList:                // IEEE: list_of_port_identifiers
@@ -315,6 +329,25 @@ id:
         ;
 idAny:                    // Any kind of identifier
         	yaID__ETC { setIdAny(); }
+        ;
+variable_lvalue:                // IEEE: variable_lvalue or net_lvalue
+                idClassSel
+        |        '{' variable_lvalueConcList '}'
+//        |        streaming_concatenation
+        ;
+variable_lvalueConcList:        // IEEE: part of variable_lvalue: '{' variable_lvalue { ',' variable_lvalue } '}'
+                variable_lvalue
+        |        variable_lvalueConcList ',' variable_lvalue
+        ;
+idClassSel:                        // Misc Ref to dotted, and/or arrayed, and/or bit-ranged variable
+                idDotted
+        ;
+idDotted:
+                idDottedMore
+        ;
+idDottedMore:
+                idArrayed                   { idDotted = tokenExpr; }
+        |        idDottedMore '.' idArrayed { idDotted += "." + tokenExpr; }
         ;
 idArrayed:                // IEEE: id + select
                 idArrayItem { finishArrayed(0); }

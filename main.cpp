@@ -35,7 +35,7 @@ static FILE *outfile, *newfile;
 
 #include "vlex.yy.c"
 
-std::string tokenId, tokenString, tokenInt, tokenFloat, tokenExpr, idAny;
+std::string tokenId, tokenString, tokenInt, tokenFloat, tokenExpr, idAny, idDotted;
 
 class Driver{
 public:
@@ -139,6 +139,8 @@ void yyerrorf(const char* format, ...)
     exit(-1);
 }
 
+typedef std::map<std::string, std::string> MapStr;
+
 typedef struct {
     std::string name;
     std::string type;
@@ -170,6 +172,7 @@ typedef struct {
     std::string type;
     std::string name;
     std::string range;
+    std::string expr;
 } PortInfo;
 PortInfo currentPort;
 
@@ -181,16 +184,21 @@ typedef struct {
 VarDeclInfo currentVarDecl;
 
 typedef struct {
+    std::string target;
+    std::string expr;
+} AssignInfo;
+
+typedef struct {
     std::string             name;
     std::list<PortInfo>     ports;
     std::list<NetInfo>      nets;
     std::list<VarDeclInfo>  vars;
     std::list<InstanceInfo> instances;
+    std::list<AssignInfo>   assigns;
 } ModuleInfo;
 ModuleInfo currentModule;
 
 std::map<std::string, int> objectCount;
-typedef std::map<std::string, std::string> MapStr;
 
 static void groupAssign(const char *prefix, MapStr &map, const char *op)
 {
@@ -327,6 +335,8 @@ void analyzeModule(ModuleInfo *module)
             range = vitem->second.range;
             vitem->second.name = "";
         }
+        if (item.expr != "")
+            name = "." + name + "(" + item.expr + " )";
         fprintf(newfile, "%s%s %s %s", sep.c_str(), direction.c_str(), range.c_str(), name.c_str());
         sep = " ,\n    ";
     }
@@ -340,6 +350,8 @@ void analyzeModule(ModuleInfo *module)
     }
     std::map<std::string, MapStr> mapStorage;
     MapStr mapAssign;
+    for (auto item: module->assigns)
+        mapAssign[item.target] = item.expr;
     for (auto item: module->instances) {
         std::string type = item.object;
         std::string initValue;
@@ -421,13 +433,21 @@ void dumpModule(ModuleInfo *module)
     fprintf(outfile, "module %s\n    (", module->name.c_str());
     std::string sep;
     for (auto item: module->ports) {
-        fprintf(outfile, "%s%s %s%s", sep.c_str(), item.direction.c_str(), item.range.c_str(), item.name.c_str());
+        std::string name = item.name;
+        if (item.expr != "")
+            name = "." + name + "(" + item.expr + " )";
+        fprintf(outfile, "%s%s %s%s", sep.c_str(), item.direction.c_str(), item.range.c_str(), name.c_str());
 //, item.type.c_str());
         sep = " ,\n    ";
     }
     fprintf(outfile, ");\n");
     for (auto item: module->vars) {
         fprintf(outfile, "    %s %s%s ;\n", item.direction.c_str(), item.range.c_str(), item.name.c_str());
+    }
+    if (module->assigns.size())
+        fprintf(outfile, "\n");
+    for (auto item: module->assigns) {
+        fprintf(outfile, "    assign %s = %s ;\n", item.target.c_str(), item.expr.c_str());
     }
     fprintf(outfile, "\n");
     for (auto item: module->nets) {
@@ -471,12 +491,17 @@ void createModule()
     currentModule.nets.clear();
     currentModule.vars.clear();
     currentModule.instances.clear();
+    currentModule.assigns.clear();
 }
 
 ///////////////////////////////////////
 void setPortName()
 {
     currentPort.name = tokenId;
+    currentPort.direction = "";
+    currentPort.type = "";
+    currentPort.range = "";
+    currentPort.expr = "";
 }
 void setNetType()
 {

@@ -643,6 +643,10 @@ std::string exprWidth(ACCExpr *expr, bool forceNumeric)
 {
     return "1";
 }
+ACCExpr *cleanupExprBuiltin(ACCExpr *expr, std::string phiDefault, bool preserveParen)
+{
+    return nullptr;
+}
 
 #undef yylex
 #define yylex driver.yylexMiddle
@@ -653,7 +657,7 @@ int main( const int argc, const char **argv )
     if( argc != 2 )
         return -1;
 
-    std::string outFilename = basename((char *)argv[1]);
+    std::string outFilename = argv[1];
     outfile = fopen((outFilename + ".out").c_str(), "w");
     newfile = fopen((outFilename + ".new").c_str(), "w");
     if (!outfile)
